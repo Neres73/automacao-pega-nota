@@ -16,8 +16,10 @@ BASE_URL = "https://nixweb.midassolutions.com.br"
 PERFIL_NAVEGADOR = os.path.join(os.environ["USERPROFILE"],
                                 "AppData", "Local", "nix_playwright_profile")
 
+# Teto de espera pela busca. Não é mais um sleep fixo: seguimos assim que o
+# botão "Visualizar" aparecer; este valor é só o limite de segurança quando a
+# ocorrência não retorna resultado.
 ESPERA_BUSCA  = 5.0
-ESPERA_VIEWER = 4.0
 TIMEOUT_RESPOSTA_PDF = 15000  # ms para aguardar a resposta do PDF após clicar
 # =================================================================
 
@@ -284,10 +286,19 @@ def processar_materiais_nix(materiais):
                 time.sleep(0.3)
 
                 campo_ocor.press("Enter")
-                time.sleep(ESPERA_BUSCA)
+
+                # Espera determinística: segue assim que o botão "Visualizar"
+                # aparecer, em vez de dormir um tempo fixo. ESPERA_BUSCA vira
+                # apenas o teto — quando a ocorrência não retorna resultado, o
+                # botão nunca aparece e caímos no timeout (mesmo tempo de antes).
+                btn_visualizar = page.locator("a.MvcGridSearchButton").first
+                try:
+                    btn_visualizar.wait_for(state="visible",
+                                            timeout=int(ESPERA_BUSCA * 1000))
+                except PlaywrightTimeout:
+                    pass
 
                 # verifica se encontrou resultado
-                btn_visualizar = page.locator("a.MvcGridSearchButton").first
                 if not btn_visualizar.is_visible():
                     print(f"  → Ocorrência {ocorrencia} não encontrada no NIX.")
                     resultados[linha] = {
